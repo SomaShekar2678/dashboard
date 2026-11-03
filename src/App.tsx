@@ -73,6 +73,65 @@ function Health({value}:{value:number}) {
 function Metric({label,value,unit,detail,icon:Icon,tone='neutral',change}:{label:string;value:string;unit?:string;detail:string;icon:any;tone?:string;change?:'up'|'down'}) {
   return <article className='metric-card'><div className='metric-top'><span>{label}</span><span className={'metric-icon '+tone}><Icon size={17}/></span></div><div className='metric-value'>{value}<small>{unit}</small></div><div className='metric-detail'>{change==='down'?<ArrowDownRight size={13}/>:change==='up'?<ArrowUpRight size={13}/>:null}{detail}</div></article>;
 }
+
+const signalSamples = Array.from({length:96},(_,i)=>({
+  sample:i,
+  amplitude:0.72*Math.sin(2*Math.PI*7*i/96)+0.24*Math.sin(2*Math.PI*19*i/96)+0.08*Math.sin(2*Math.PI*31*i/96)
+}));
+const spectrumBins = Array.from({length:24},(_,k)=>{
+  const re=signalSamples.reduce((sum,p,i)=>sum+p.amplitude*Math.cos(2*Math.PI*k*i/96),0);
+  const im=signalSamples.reduce((sum,p,i)=>sum-p.amplitude*Math.sin(2*Math.PI*k*i/96),0);
+  return {bin:k,magnitude:Math.sqrt(re*re+im*im)/48};
+});
+
+function HealthRing({value}:{value:number}) {
+  const radius=43;
+  const circumference=2*Math.PI*radius;
+  const color=value<40?'var(--red)':value<70?'var(--amber)':'var(--green)';
+  return <div className="health-ring-wrap"><svg viewBox="0 0 112 112" role="img" aria-label={`Asset health ${value} percent`}><circle className="ring-track" cx="56" cy="56" r={radius}/><circle className="ring-value" cx="56" cy="56" r={radius} stroke={color} strokeDasharray={circumference} strokeDashoffset={circumference*(1-value/100)}/></svg><div className="ring-label"><b>{value}</b><span>HEALTH</span></div></div>;
+}
+
+function AdvancedInsights({assets,onSelect}:{assets:Asset[];onSelect:(asset:Asset)=>void}) {
+  const [signalAssetId,setSignalAssetId]=useState('AST-001');
+  const [signalView,setSignalView]=useState<'waveform'|'spectrum'>('waveform');
+  const selected=assets.find(a=>a.id===signalAssetId)??assets[0];
+  const avg=Math.round(assets.reduce((sum,a)=>sum+a.health,0)/Math.max(assets.length,1));
+  const ranked=assets.slice().sort((a,b)=>a.rul-b.rul).slice(0,4);
+  const topologyIds=['AST-001','AST-002','AST-003','AST-005','AST-007','AST-008'];
+  return <section className="advanced-stack">
+    <div className="advanced-heading"><div><span className="eyebrow">ADVANCED CONDITION INTELLIGENCE</span><h2>Equipment intelligence</h2><p>Interactive topology, condition scoring and signal diagnostics</p></div><span className="subtle-pill">Synthetic demonstration</span></div>
+    <div className="advanced-grid">
+      <article className="panel health-intelligence">
+        <div className="panel-heading"><div><h2>Fleet health index</h2><p>Aggregate of the displayed asset health scores</p></div><Gauge size={17}/></div>
+        <div className="health-ring-row"><HealthRing value={avg}/><div className="health-ring-copy"><b>{assets.filter(a=>a.status==='Critical').length} critical assets</b><span>Require priority assessment</span><b>{assets.filter(a=>a.status==='Warning').length} warning assets</b><span>Require closer monitoring</span></div></div>
+        <div className="ring-foot"><span>Health bands</span><span><i className="green-dot"/> ≥70</span><span><i className="amber-dot"/> 40–69</span><span><i className="red-dot"/> &lt;40</span></div>
+      </article>
+      <article className="panel topology-panel">
+        <div className="panel-heading"><div><h2>Plant equipment topology</h2><p>Select a node to inspect its current demo condition</p></div><span className="subtle-pill">Logical view</span></div>
+        <div className="topology-flow">
+          <div className="topology-rail"><span>PROCESS INPUT</span><i/></div>
+          <div className="topology-nodes">{topologyIds.map(id=>{const a=assets.find(x=>x.id===id);if(!a)return null;return <button key={id} className={`topology-node node-${a.status.toLowerCase()}`} onClick={()=>onSelect(a)}><span className="node-symbol"><Activity size={16}/></span><span><b>{a.name}</b><small>{a.id} · {a.plant}</small></span><strong>{a.health}%</strong><i className="node-status"/></button>})}</div>
+          <div className="topology-rail"><i/><span>PROCESS OUTPUT</span></div>
+        </div>
+        <div className="topology-note"><span className="system-dot"/>Logical asset relationships are illustrative; no plant P&amp;ID or live connectivity is loaded.</div>
+      </article>
+    </div>
+    <div className="advanced-grid advanced-grid-bottom">
+      <article className="panel signal-panel">
+        <div className="panel-heading"><div><h2>Vibration signal laboratory</h2><p>Deterministic synthetic waveform · Not measured telemetry</p></div><Activity size={17}/></div>
+        <div className="signal-controls"><select value={signalAssetId} onChange={e=>setSignalAssetId(e.target.value)} aria-label="Select asset for signal demo">{assets.map(a=><option value={a.id} key={a.id}>{a.id} · {a.name}</option>)}</select><div className="segmented"><button className={signalView==='waveform'?'selected':''} onClick={()=>setSignalView('waveform')}>Waveform</button><button className={signalView==='spectrum'?'selected':''} onClick={()=>setSignalView('spectrum')}>FFT spectrum</button></div></div>
+        <div className="signal-chart"><ResponsiveContainer width="100%" height="100%">{signalView==='waveform'?<LineChart data={signalSamples}><CartesianGrid strokeDasharray="3 3" stroke="var(--grid)" vertical={false}/><XAxis dataKey="sample" tickLine={false} axisLine={false} tick={{fontSize:9}}/><YAxis tickLine={false} axisLine={false} tick={{fontSize:9}}/><Tooltip contentStyle={{background:'var(--tooltip)',border:'1px solid var(--border)',borderRadius:8}}/><Line dataKey="amplitude" name="Normalised amplitude" stroke="#5b9ee8" strokeWidth={1.8} dot={false} isAnimationActive={false}/></LineChart>:<AreaChart data={spectrumBins}><CartesianGrid strokeDasharray="3 3" stroke="var(--grid)" vertical={false}/><XAxis dataKey="bin" tickLine={false} axisLine={false} tick={{fontSize:9}}/><YAxis tickLine={false} axisLine={false} tick={{fontSize:9}}/><Tooltip contentStyle={{background:'var(--tooltip)',border:'1px solid var(--border)',borderRadius:8}}/><Area dataKey="magnitude" name="Relative magnitude" stroke="#9b86e8" fill="#9b86e8" fillOpacity={.18} isAnimationActive={false}/></AreaChart>}</ResponsiveContainer></div>
+        <div className="signal-foot"><span>Asset: <b>{selected?.id??'—'}</b></span><span>Live vibration reading: <b>{selected?.vibration.toFixed(1)??'—'} mm/s</b></span><span>Signal source: <b>synthetic</b></span></div>
+      </article>
+      <article className="panel rul-panel">
+        <div className="panel-heading"><div><h2>RUL priority horizon</h2><p>Assets ranked by displayed remaining useful life</p></div><Clock3 size={17}/></div>
+        <div className="rul-list">{ranked.map((a,index)=><button className="rul-row" key={a.id} onClick={()=>onSelect(a)}><span className="rul-rank">0{index+1}</span><span className="rul-main"><b>{a.name}</b><small>{a.id} · {a.failureMode}</small><i><em style={{width:`${Math.max(5,Math.min(100,a.rul/180*100))}%`}}/></i></span><strong className={a.rul<=14?'rul-urgent':''}>{a.rul}<small>days</small></strong></button>)}</div>
+        <p className="rul-disclaimer">RUL values are illustrative point estimates. No confidence interval is shown because no validated uncertainty model is connected.</p>
+      </article>
+    </div>
+  </section>;
+}
+
 function App() {
   const [assets,setAssets] = useState(initialAssets);
   const [orders,setOrders] = useState(initialOrders);
@@ -182,6 +241,7 @@ function App() {
             </div>
             <div className='section-heading'><div><h2>Plant performance</h2><p>Asset condition summary by operating location</p></div><button className='text-button' onClick={()=>navigate('/plants')}>View all plants <ChevronRight size={14}/></button></div>
             <div className='plant-grid'>{plants.map(p=><article className='plant-card' key={p.name} onClick={()=>{setSelectedPlant(p.name);navigate('/assets')}}><div className='plant-card-top'><span className='plant-icon'><Factory size={18}/></span><span className='plant-alert'>{p.alerts>0?<><i/>{p.alerts} alerts</>:'No active alerts'}</span></div><h3>{p.name}</h3><p>{p.location}</p><div className='plant-stats'><span>Assets <b>{p.assets}</b></span><span>Availability <b>{p.availability}%</b></span></div><div className='plant-health'><span>Average health</span><Health value={p.health}/></div></article>)}</div>
+            <AdvancedInsights assets={assets} onSelect={setSelectedAsset}/>
             <div className='dashboard-columns'><section className='panel'><div className='panel-heading'><div><h2>Asset condition trend</h2><p>Condition distribution · Last 7 days</p></div><span className='subtle-pill'>Demo data</span></div><div className='chart chart-large'><ResponsiveContainer width='100%' height='100%'><AreaChart data={history}><defs><linearGradient id='healthyFill' x1='0' y1='0' x2='0' y2='1'><stop offset='0%' stopColor='#3bb98a' stopOpacity={.25}/><stop offset='100%' stopColor='#3bb98a' stopOpacity={0}/></linearGradient></defs><CartesianGrid strokeDasharray='3 3' stroke='var(--grid)' vertical={false}/><XAxis dataKey='day' tickLine={false} axisLine={false}/><YAxis allowDecimals={false} tickLine={false} axisLine={false}/><Tooltip contentStyle={{background:'var(--tooltip)',border:'1px solid var(--border)',borderRadius:9,color:'var(--text)'}}/><Area dataKey='healthy' name='Healthy' type='monotone' stroke='#3bb98a' fill='url(#healthyFill)'/><Line dataKey='warning' name='Warning' type='monotone' stroke='#e5a642' strokeWidth={2}/><Line dataKey='critical' name='Critical' type='monotone' stroke='#e46c72' strokeWidth={2}/></AreaChart></ResponsiveContainer></div><div className='chart-legend'><span><i className='green-dot'/>Healthy</span><span><i className='amber-dot'/>Warning</span><span><i className='red-dot'/>Critical</span></div></section>
               <section className='panel'><div className='panel-heading'><div><h2>Priority attention</h2><p>Assets requiring closer monitoring</p></div><button className='text-button' onClick={()=>navigate('/alerts')}>All alerts <ChevronRight size={14}/></button></div><div className='attention-list'>{assets.filter(a=>a.status!=='Healthy').sort((a,b)=>a.health-b.health).map(a=><button className='attention-row' key={a.id} onClick={()=>setSelectedAsset(a)}><span className={'attention-icon '+a.status.toLowerCase()}><AlertTriangle size={16}/></span><span><b>{a.name}</b><small>{a.id} · {a.failureMode}</small></span><span className='attention-health'>{a.health}%<small>health</small></span></button>)}</div></section></div>
             <section className='panel table-panel'><div className='panel-heading'><div><h2>Asset register</h2><p>Latest condition indicators across monitored equipment</p></div><button className='text-button' onClick={()=>navigate('/assets')}>View asset register <ChevronRight size={14}/></button></div>{assetTable(assets.slice(0,5))}</section>
