@@ -105,6 +105,47 @@ function App() {
     window.addEventListener('keydown',handler);
     return ()=>window.removeEventListener('keydown',handler);
   },[]);
+  const toggleTheme = (event: React.MouseEvent<HTMLButtonElement>) => {
+    const nextTheme = theme === 'dark' ? 'light' : 'dark';
+    const applyTheme = () => setTheme(nextTheme);
+    const transitionDocument = document as Document & {
+      startViewTransition?: (update: () => void) => { ready: Promise<void> };
+    };
+
+    if (
+      !transitionDocument.startViewTransition ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      applyTheme();
+      return;
+    }
+
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    const radius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    );
+
+    const transition = transitionDocument.startViewTransition(applyTheme);
+    transition.ready.then(() => {
+      document.documentElement.animate(
+        {
+          clipPath: [
+            `circle(0 at ${x}px ${y}px)`,
+            `circle(${radius}px at ${x}px ${y}px)`
+          ]
+        },
+        {
+          duration: 700,
+          easing: 'ease-in-out',
+          pseudoElement: '::view-transition-new(root)'
+        }
+      );
+    });
+  };
+
   const createOrder=()=>{
     if(!workTitle.trim()) return;
     setOrders(prev=>[{id:'WO-'+(2409+prev.length),asset:workAsset,title:workTitle.trim(),priority:workPriority,status:'Open',due:'Unscheduled'},...prev]);
@@ -127,7 +168,7 @@ function App() {
       <div className='sidebar-bottom'><div className='system-card'><div className='system-dot'/><span><b>Monitoring active</b><small>Demo environment · Local data</small></span></div><button className='nav-link' onClick={()=>navigate('/data-models')}><Settings2 size={17}/>System settings</button><div className='profile'><div className='profile-avatar'>SR</div><span><b>Maintenance admin</b><small>Administrator</small></span><ChevronDown size={14}/></div></div>
     </aside>
     <main className='main'>
-      <header className='topbar'><button className='mobile-menu' onClick={()=>setMobileNav(true)}><Menu size={19}/></button><div className='breadcrumb'>APMS <ChevronRight size={14}/><b>{title}</b></div><div className='top-actions'><label className='global-search'><Search size={15}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search assets...'/><kbd>Ctrl K</kbd></label><button className='icon-button' title='Toggle theme' onClick={()=>setTheme(t=>t==='dark'?'light':'dark')}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><button className='icon-button notification-button' onClick={()=>setNotice(v=>!v)}><Bell size={18}/><i/></button><div className='top-avatar'>SR</div></div></header>
+      <header className='topbar'><button className='mobile-menu' onClick={()=>setMobileNav(true)}><Menu size={19}/></button><div className='breadcrumb'>APMS <ChevronRight size={14}/><b>{title}</b></div><div className='top-actions'><label className='global-search'><Search size={15}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder='Search assets...'/><kbd>Ctrl K</kbd></label><button className='icon-button' title='Toggle theme' onClick={toggleTheme}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}</button><button className='icon-button notification-button' onClick={()=>setNotice(v=>!v)}><Bell size={18}/><i/></button><div className='top-avatar'>SR</div></div></header>
       {notice&&<div className='notification-pop'><b>Maintenance notifications</b><p>{critical} critical and {warning} warning assets need attention.</p><button onClick={()=>{setNotice(false);navigate('/alerts')}}>Review alerts <ChevronRight size={13}/></button></div>}
       <div className='content'>
         <Routes>
